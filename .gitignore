@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Data: raw files are downloaded from UCI, never committed
+data/
+
+# Generated outputs (added later)
+models/
+
+# Editor / OS
+.vscode/
+.ipynb_checkpoints/
+Thumbs.db
