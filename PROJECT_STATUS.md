@@ -1,7 +1,71 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 2 — Data understanding (started). No preprocessing or modeling yet.
+Phase 2 — Data understanding (in progress). No preprocessing or modeling yet.
+
+## Open decisions for Phase 3 (preprocessing)
+- `ac_000` coded values (`0x7F000000` + leftover): default = flag column + set value to missing (option b). Option (a) "flag + keep leftover" to test later as an experiment.
+- Missing-value indicators: needed; consider one indicator per identical-missingness group instead of 169.
+- Row 45977 (suspected corrupted record): keep, documented.
+- Heavy-tailed columns (e.g. `dq_000`): consider log transform for logistic regression.
+- Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 2 — 2026-11-06
+
+**Objective:** test the Session 1 data-quality hypotheses (huge values, missingness) on the training set.
+
+### Files created / changed
+- `src/investigate_quality.py` (new) — H1 huge-value checks A–D, H2 missingness checks A, A2, B, C. Describes only; changes nothing.
+- `requirements.txt` — to be regenerated with `pip freeze` (numpy now imported directly).
+- `PROJECT_STATUS.md` — this section.
+
+### Commands actually run (by the user)
+- `python -m src.investigate_quality` → ran successfully on the real training data (twice; second run added check D).
+
+### Verified results (training set)
+**H1 — huge values (≥ 2,000,000,000)**
+| Finding | Result |
+|---|---|
+| Cells / rows | 9,513 cells in 9,511 rows |
+| `ac_000` | 9,468 huge values; largest normal value 265,766 (≈ 8,000× gap) |
+| Pattern | 100% of `ac_000` huge values = `0x7F000000` (2,130,706,432) + leftover; leftover 0–364, median 0, normal `ac_000` median 74 |
+| Most common | `0x7F000000` exactly: 6,188 times |
+| Class | rows with a huge value: 0.33% positive (vs 1.67% overall) → informative |
+| `dq_000` | 42 huge values, no `0x7F` prefix; normal values reach 1.99 × 10⁹ → genuine heavy tail |
+| Row 45977 | only row with huge `ad_000`, `cf_000`, `co_000` (same missing group), class neg, no prefix → suspected corrupted record |
+| Evenness | every column has 100% even normal values (dataset-wide property) → evenness is not evidence for the code |
+
+**H2 — missingness**
+| Finding | Result |
+|---|---|
+| Identical-missingness groups | 24 groups covering 136 of 169 columns with missing values |
+| `ab_000` + `cr_000` | identical (77.2%); `bo_000` has the same rate but only 59% overlap → same rate ≠ same rows |
+| `bm_000`…`br_000` | nested "staircase", 80–99% overlap |
+| Per-class (strongest) | `br_000` missing 83.3% neg vs 9.0% pos; `ak_000` 6.6% neg vs 53.2% pos |
+| Rows by n_missing | 0 → 12.86% pos; 1–10 → 0.42%; 11–20 → 4.24%; 21–50 → 2.71%; 51–100 → 10.44%; 101–170 → 0.69% |
+
+### Hypothesis status
+- Huge values are codes → **confirmed for `ac_000`** (systematic `0x7F` prefix, gap, informative). Meaning of leftover → **unproven**. Not true for `dq_000`.
+- Same missing rate ⇒ missing together → **partly wrong** (`ab_000`/`cr_000` yes, `bo_000` no).
+- Missingness is informative → **confirmed descriptively, in both directions per column**; "positives miss more" was too simple.
+
+### Limitation to document in README
+Missingness patterns are strongly linked to the class. A model may learn how the data was recorded rather than truck behaviour; this helps on the benchmark but may not transfer to a deployment where data is recorded differently.
+
+### Understood
+- Gap, repetition and class checks to tell codes from real extreme values.
+- Reading numbers in hexadecimal to spot coded values.
+- Same missing rate does not mean same missing rows.
+- Deleting rows needs a documented reason; deleting the 9,511 coded rows would remove 16% of the data and a real signal.
+
+### Still unclear / to review
+- Answering "why" with evidence when interpreting results (practise next session).
+- Cost metric (FP = 10, FN = 500) — Phase 4.
+
+### Next recommended task
+Finish Phase 2: feature distributions and scale (skewness, need for log transform), histogram-bin consistency check, and first `pytest` tests for `data_loading.py`.
 
 ---
 
@@ -48,7 +112,7 @@ Phase 2 — Data understanding (started). No preprocessing or modeling yet.
 - Only the string `na` counts as missing (`keep_default_na=False`) so unexpected values stay visible.
 - `cd_000` will be dropped during preprocessing (constant in training data).
 
-### Hypotheses (NOT yet verified)
+### Hypotheses raised (tested in Session 2 — see above)
 - Missingness is informative (positives have about 2× more missing values) → may add "was missing" indicator features.
 - Columns with identical missing rates (e.g. `ab_000`, `bo_000`, `cr_000` at 77.2%) may be missing together.
 - Very large values like `2130706438` in `ac_000` (near the 32-bit integer limit) may be sentinel/error codes rather than real measurements.
