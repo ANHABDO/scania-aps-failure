@@ -1,14 +1,58 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 2 — Data understanding (in progress). No preprocessing or modeling yet.
+Phase 2 — Data understanding: **complete**. Next: Phase 3 — preprocessing and baseline.
 
 ## Open decisions for Phase 3 (preprocessing)
 - `ac_000` coded values (`0x7F000000` + leftover): default = flag column + set value to missing (option b). Option (a) "flag + keep leftover" to test later as an experiment.
 - Missing-value indicators: needed; consider one indicator per identical-missingness group instead of 169.
-- Row 45977 (suspected corrupted record): keep, documented.
-- Heavy-tailed columns (e.g. `dq_000`): consider log transform for logistic regression.
+- Row 45977 (`ad_000`, `cf_000`, `co_000` ≈ 8.58 × 10⁹, nearly identical): **updated recommendation — treat these three values as missing** (strong evidence of corruption). Keep the row.
+- Logistic regression: `log1p` transform then standardize. Tree models: no transform needed.
+- Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
+- Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 3 — 2026-11-06
+
+**Objective:** finish Phase 2 (negatives, skewness/scale, log transform, histogram consistency) and add first automated tests.
+
+### Files created / changed
+- `src/explore_distributions.py` (new) — Q1–Q4 below; treats `ac_000` coded values as missing before statistics.
+- `tests/test_data_loading.py` (new) — 8 tests on fake files (`tmp_path`, `monkeypatch`, `pytest.raises`) + 1 test on the real training file (skipped if absent). *Was first saved in `src/`; to be moved to `tests/`.*
+- `requirements.txt` — regenerated with `pip freeze` (now includes pytest 9.2.0 and all dependencies).
+
+### Commands actually run (by the user)
+- `python -m pip install pytest` → pytest 9.2.0 installed.
+- `python -m pytest -v` → **9 passed** (including the real-data test: 60,000 × 171, neg 59,000 / pos 1,000).
+- `python -m src.explore_distributions` → ran successfully.
+- `git log --oneline` → Session 2 commit confirmed: `ac37c62`.
+
+### Verified results (training set)
+| Check | Result |
+|---|---|
+| Negative values | none in any column |
+| Zero-heavy columns | 56 columns > 50% zeros; 33 columns > 90% zeros |
+| Scale | column maximum from 2 (`ch_000`) to 8,584,297,742 (`ad_000`) |
+| Skewness | 163 of 170 columns \|skew\| > 1; 115 > 10; median skew 18.4 |
+| After `log1p` | \|skew\| > 1 drops from 163 to 85 columns; e.g. `ad_000` 212.5 → −0.4, `cf_000` 212.5 → 3.3 |
+| Still skewed after log | mostly zero-heavy columns (e.g. `ag_000` median 0, skew 20.8 after log) |
+| `ad_000`, `cf_000`, `co_000` maxima | all ≈ 8.58 × 10⁹ — the same row 45977 |
+| Histogram totals | 7 groups have the same median total (2,137,520); totals exactly equal for 97–100% of trucks; Spearman correlation 1.00 |
+
+### Understood
+- Logistic regression: inputs can be any number; only the output (via sigmoid) is between 0 and 1. Huge inputs dominate `z = w·x + b`, which is why we log-transform and standardize.
+- Tree models are insensitive to feature scale.
+- `log1p` is used because `log(0)` is undefined.
+- A log transform cannot fix "mostly zeros" skew.
+- What a test is; fake data in `tmp_path`; tests that check errors are raised.
+
+### Corrected misunderstanding
+- Initially thought logistic regression needs inputs between 0 and 1 → corrected (see above).
+
+### Next recommended task
+Phase 3 start: stratified train/validation split of the training set (fixed seed), the cost metric (10·FP + 500·FN) as a tested function, and a dummy baseline.
 
 ---
 
