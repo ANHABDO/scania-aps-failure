@@ -1,7 +1,24 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 2 — Data understanding: **complete**. Next: Phase 3 — preprocessing and baseline.
+Phase 3 — Preprocessing and baseline: **in progress** (evaluation framework + dummy baselines done; preprocessing pipeline next).
+
+## Phase overview
+| Phase | Content | Status |
+|---|---|---|
+| 0 | Setup: folders, venv, requirements, Git | done |
+| 1 | AI4I warm-up (optional) | skipped |
+| 2 | Data understanding + first tests | done (Sessions 1–3) |
+| 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | in progress (Session 4) |
+| 4 | Tree models, imbalance handling, fair comparison, threshold, error analysis | later |
+| 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
+
+## Key numbers to beat (validation set, 12,000 rows, 200 positives)
+| Model | Cost | Recall | Accuracy |
+|---|---|---|---|
+| always_neg | 100,000 | 0% | 98.33% |
+| always_pos | 118,000 | 100% | 1.67% |
+| random_guess | 98,760 | 3% | 96.92% |
 
 ## Open decisions for Phase 3 (preprocessing)
 - `ac_000` coded values (`0x7F000000` + leftover): default = flag column + set value to missing (option b). Option (a) "flag + keep leftover" to test later as an experiment.
@@ -11,6 +28,43 @@ Phase 2 — Data understanding: **complete**. Next: Phase 3 — preprocessing an
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 4 — 2026-11-08
+
+**Objective:** build the evaluation framework (train/validation split, official cost metric) and score dummy baselines.
+
+### Files created / changed
+- `src/splitting.py` (new) — `split_features_target()` (pos → 1, neg → 0), `train_val_split()` (stratified, 20% validation, `RANDOM_SEED = 42`).
+- `src/metrics.py` (new) — `confusion_counts()`, `total_cost()` (10·FP + 500·FN), `evaluate()` (counts, accuracy, precision, recall, cost).
+- `src/run_baselines.py` (new) — split + 3 `DummyClassifier` baselines, saves `reports/baseline_results.csv`.
+- `tests/test_metrics.py` (new, 8 tests) and `tests/test_splitting.py` (new, 5 tests).
+- `docs/GLOSSARY.md` (new) — technical terms with project examples; updated every session.
+- `reports/baseline_results.csv` (generated).
+- `requirements.txt` — regenerated with `pip freeze` (adds scikit-learn 1.9.1).
+
+### Commands actually run (by the user)
+- `python -m pip install scikit-learn` → scikit-learn 1.9.1.
+- `python -m pytest -v` → **22 passed**.
+- `python -m src.run_baselines` → ran successfully; results below.
+- `git log --oneline` → Session 3 commit confirmed: `62e6477`.
+
+### Verified results (validation set)
+- Split: train 48,000 rows / 800 positives; validation 12,000 rows / 200 positives; both 1.67%.
+- Baselines: see "Key numbers to beat" at the top.
+- Highest accuracy (always_neg, 98.33%) ≠ lowest cost (random_guess, 98,760). Recall 100% (always_pos) gives the worst cost.
+- The random baseline gave exactly the same numbers on a fake file with the same class counts: neither the stratified split's class pattern nor the dummy predictions depend on feature values.
+
+### Understood
+- Train / validation / test roles; data leakage.
+- Stratified split and why it matters with 1.67% positives; random seed for reproducibility.
+- Confusion matrix (TP, FP, FN, TN), accuracy, precision, recall, cost.
+- `fit` / `predict`.
+- Break-even: one caught failure (saves 500) is worth up to 50 false alarms (10 each) → flagging pays off whenever precision is above about 2%.
+
+### Next recommended task
+Session 5: preprocessing pipeline fitted on train only (drop `cd_000`; `ac_000` code → flag + missing; row 45977 values → missing; missing indicators; median imputation; `log1p`; standardization) + first logistic regression, scored with the cost metric on validation.
 
 ---
 
