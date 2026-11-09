@@ -1,7 +1,7 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 4 — Models and evaluation: **in progress** (threshold tuning done; tree model next).
+Phase 4 — Models and evaluation: **in progress** (threshold tuning and model comparison done; error analysis next).
 
 ## Phase overview
 | Phase | Content | Status |
@@ -10,7 +10,7 @@ Phase 4 — Models and evaluation: **in progress** (threshold tuning done; tree 
 | 1 | AI4I warm-up (optional) | skipped |
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
 | 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
-| 4 | Threshold (done, Session 6), tree model + fair comparison, error analysis | in progress |
+| 4 | Threshold (done, S6), tree model + fair comparison (done, S7), error analysis | in progress |
 | 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
 
 ## Key numbers to beat (validation set, 12,000 rows, 200 positives)
@@ -21,7 +21,10 @@ Phase 4 — Models and evaluation: **in progress** (threshold tuning done; tree 
 | random_guess | 98,760 | 3% | 96.92% |
 | logreg_plain (threshold 0.5) | 30,800 | 69.5% | 99.24% |
 | logreg_balanced (threshold 0.5) | 11,410 | 93.0% | 96.21% |
-| **logreg_balanced (threshold 0.39, chosen by 5-fold CV) — current model** | **11,790** | **93.5%** | 95.48% |
+| logreg_balanced (threshold 0.39, chosen by 5-fold CV) | 11,790 | 93.5% | 95.48% |
+| **hgb_balanced (threshold 0.14, chosen by 5-fold CV) — current best** | **6,670** | **97.0%** | 96.89% |
+
+Main comparison is CV on train (800 failures): logreg 42,880 vs hgb 35,150 (about −18%).
 
 Noise level: 1 truck = 500 cost on validation → differences below about 1,000 are not meaningful.
 
@@ -33,6 +36,57 @@ Noise level: 1 truck = 500 cost on validation → differences below about 1,000 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 7 — 2026-11-09
+
+**Objective:** add a tree-based model and compare it fairly with logistic regression.
+
+### Files created / changed
+- `src/models.py` — added `make_hgb_pipeline()`: `CleanRawValues` + `HistGradientBoostingClassifier(class_weight="balanced", random_state=42)` (no imputation, log or scaling).
+- `src/threshold.py` — added `out_of_fold_proba()` (shared CV helper).
+- `src/compare_models.py` (new) — same 5-fold CV for each model, own CV threshold, per-fold costs, average precision, one validation check; saves `reports/model_comparison.csv`.
+- `tests/test_models.py` — 3 boosting tests (missing values left in, learns a rule, repeatable).
+- `docs/GLOSSARY.md`, `docs/INTERVIEW_NOTES.md` — updated (files moved from root to `docs/`).
+
+### Commands actually run (by the user)
+- `git log` → Session 6 commit `2be7a57`.
+- `python -m pytest -v` → **42 passed**.
+- `python -m src.compare_models` → ran successfully (logreg 85 s, boosting 275 s on the T480).
+
+### Verified results
+**A) CV on train (800 failures)**
+| Model | Threshold | CV cost | Fold range | Recall | Avg precision |
+|---|---|---|---|---|---|
+| logreg_balanced | 0.39 | 42,880 | 7,140 – 9,430 | 94.0% | 0.779 |
+| hgb_balanced | 0.14 | **35,150** | 5,670 – 8,470 | 94.8% | **0.828** |
+
+**B) Validation (200 failures)**
+| Model | FN | FP | Recall | Precision | Avg precision | Cost |
+|---|---|---|---|---|---|---|
+| logreg_balanced | 13 | 529 | 93.5% | 26.1% | 0.772 | 11,790 |
+| hgb_balanced | **6** | **367** | 97.0% | 34.6% | 0.849 | **6,670** |
+
+### Interpretation
+- Boosting is better on every measure; on validation it reduces misses and false alarms at the same time.
+- Validation gap (5,120) is well above noise (about 1,000).
+- Honest size of improvement: about 18% (CV, 800 failures). Validation's 43% is likely partly favourable luck. Per-fold ranges overlap.
+- Different thresholds (0.14 vs 0.39) confirm that each model needs its own threshold.
+- Trade-off: boosting is about 3× slower to train.
+- Why boosting wins: native missing-value handling (missingness is informative) and non-linear rules / interactions. Not because it skips log and scaling (those keep the order of values and remove no information).
+
+### Decisions
+- **`hgb_balanced` with threshold 0.14 is the current best model.**
+- Master brief criterion "a baseline and at least two suitable models compared fairly" is met.
+
+### Understood
+- Gradient boosting (sequential trees correcting errors), early stopping, native missing handling.
+- Why each model needs its own threshold; average precision as a threshold-free ranking score.
+- Predicted correctly that boosting would win; reason refined (missing handling + non-linearity, not "no preprocessing").
+
+### Next recommended task
+Session 8: error analysis on the current best model — study the missed failures and the false alarms (cross-validated on train), and which features drive the predictions (permutation importance).
 
 ---
 

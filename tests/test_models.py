@@ -42,3 +42,28 @@ def test_pipeline_learns_a_simple_rule():
     model = make_logreg_pipeline().fit(X, y)
     X_new, y_new = raw_like_data(seed=1)
     assert (model.predict(X_new) == y_new).mean() > 0.8
+
+
+# ---------------------------------------------------------------- gradient boosting
+from src.models import make_hgb_pipeline  # noqa: E402
+
+
+def test_hgb_handles_missing_values_without_imputation():
+    X, y = raw_like_data()
+    assert X.isna().any().any()                     # the data really has missing values
+    proba = make_hgb_pipeline().fit(X, y).predict_proba(X)[:, 1]
+    assert ((proba >= 0) & (proba <= 1)).all()
+
+
+def test_hgb_learns_a_simple_rule():
+    X, y = raw_like_data(n=400)
+    model = make_hgb_pipeline().fit(X, y)
+    X_new, y_new = raw_like_data(n=400, seed=1)
+    assert (model.predict(X_new) == y_new).mean() > 0.8
+
+
+def test_hgb_is_repeatable_with_fixed_seed():
+    X, y = raw_like_data(n=400)
+    a = make_hgb_pipeline().fit(X, y).predict_proba(X)[:, 1]
+    b = make_hgb_pipeline().fit(X, y).predict_proba(X)[:, 1]
+    assert np.array_equal(a, b)

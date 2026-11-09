@@ -8,7 +8,7 @@ Updated every session.
 
 ## The project in 30 seconds
 
-> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. My current best model, a class-balanced logistic regression inside a leak-free scikit-learn pipeline with a threshold chosen by cross-validation, catches about 93% of failures on validation and cuts the cost from about 98,760 for the best dummy baseline to about 11,800."
+> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. I compared a logistic regression and a gradient-boosting model under identical cross-validation. Gradient boosting won: about 18% lower cross-validated cost, and on validation it catches 97% of failures, cutting the cost from about 98,760 for the best dummy baseline to 6,670."
 
 ---
 
@@ -69,6 +69,18 @@ I tested 144 thresholds on 5-fold cross-validated predictions from the training 
 **Q: Did threshold tuning help?**
 Honestly, not much for this model. The cost is almost flat between 0.3 and 0.5, and on validation 0.39 cost 11,790 versus 11,410 at 0.5. That difference is about one truck, so it is noise. The class weighting had already shifted the probabilities, which does the same job as lowering the threshold.
 
+**Q: Why did gradient boosting beat logistic regression?**
+Two reasons. First, it handles missing values itself and learns at each split which way missing trucks should go, and missingness is a strong clue in this data. Second, it is non-linear: it can learn combinations like "this value is coded AND that one is missing", while logistic regression only adds a fixed push per feature. It also needs no log or scaling, because trees only use the order of values.
+
+**Q: How did you make the comparison fair?**
+Same train rows, same 5-fold cross-validation, same class weighting, and each model got its own cost-optimal threshold (0.39 for logistic regression, 0.14 for boosting), because their probabilities are on different scales. The main comparison uses cross-validation on 800 failures; validation is a single confirmation.
+
+**Q: How big is the improvement, honestly?**
+About 18% lower cost in cross-validation (35,150 vs 42,880). Validation shows 43% (6,670 vs 11,790), but with only 200 failures that is partly luck, so I quote the cross-validation figure. On validation, boosting made fewer misses (6 vs 13) and fewer false alarms (367 vs 529) at the same time. The trade-off: it trains about 3 times slower.
+
+**Q: What is average precision and why report it?**
+A 0–1 score of how well the model ranks real failures at the top of the list, independent of the threshold. Boosting: 0.828 vs 0.779 in cross-validation. It confirms the ranking itself is better, not just the threshold choice.
+
 **Q: Why not oversampling or SMOTE?**
 Class weights give a similar effect without creating artificial data. Those methods remain options to compare later.
 
@@ -92,6 +104,7 @@ A fixed random seed (42), pinned dependencies (`requirements.txt` from `pip free
 | Random guess | 98,760 | 3.0% | 3.3% | 96.92% |
 | Logistic regression | 30,800 | 69.5% | 82.3% | 99.24% |
 | Logistic regression, balanced (threshold 0.5) | 11,410 | 93.0% | 29.7% | 96.21% |
-| **Logistic regression, balanced (threshold 0.39, chosen by CV)** | **11,790** | **93.5%** | 26.1% | 95.48% |
+| Logistic regression, balanced (threshold 0.39, chosen by CV) | 11,790 | 93.5% | 26.1% | 95.48% |
+| **Gradient boosting, balanced (threshold 0.14, chosen by CV)** | **6,670** | **97.0%** | 34.6% | 96.89% |
 
 These are validation results. With only 200 failures, differences below about 1,000 are noise. The final test-set score will be measured only once, at the end.

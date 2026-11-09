@@ -5,6 +5,7 @@ A truck is predicted "pos" (1) when its probability >= threshold.
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import cross_val_predict
 
 from src.metrics import COST_FN, COST_FP
 
@@ -45,3 +46,9 @@ def cost_at_thresholds(y_true, proba, thresholds=DEFAULT_THRESHOLDS) -> pd.DataF
 def best_threshold(table: pd.DataFrame) -> float:
     """Threshold with the lowest cost (if several tie, the smallest one)."""
     return float(table["cost"].idxmin())
+
+
+def out_of_fold_proba(model, X, y, cv) -> np.ndarray:
+    """Cross-validated probability of "pos" for every row (each row predicted
+    by a model trained without it). The whole pipeline is refitted in each fold."""
+    return cross_val_predict(model, X, y, cv=cv, method="predict_proba")[:, 1]

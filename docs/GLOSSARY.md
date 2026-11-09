@@ -103,3 +103,19 @@ Grouped by the session where the term first appeared.
 | **Overfitting to validation** | Tuning choices until they fit the validation set's specific rows; the score then looks better than it would on new data. | "Peeking" picks 0.26 (cost 10,830) instead of CV's 0.39. |
 | **Noise** | Random variation that is not a real difference. | 1 truck = 500 cost; differences below about 1,000 on validation are not meaningful. |
 | **Flat optimum** | A range of settings that all perform about equally well. | Thresholds 0.3–0.5: CV cost within about 4%. |
+
+## Tree models and fair comparison (Session 7)
+
+| Term | Simple meaning | In our project |
+|---|---|---|
+| **Gradient boosting** | Many small decision trees built one after another; each new tree corrects the mistakes of the previous ones (like golf shots). | `HistGradientBoostingClassifier`, CV cost 35,150 vs 42,880. |
+| **Ensemble** | A model made of many smaller models combined. | Gradient boosting (sequential trees), Random Forest (independent trees that vote). |
+| **Histogram-based ("Hist")** | Values are first sorted into up to 255 buckets, which makes training fast and light on memory. | Why it runs on the T480. |
+| **Native missing-value handling** | The model deals with missing values itself; at each split it learns which side missing values should go. | No imputation in the boosting pipeline. |
+| **Early stopping** | Stop adding trees when a held-out part of the training data stops improving, to avoid memorizing. | Automatic (on 10% of train), fixed by `random_state=42`. |
+| **Overfitting** | Memorizing the training data, including its noise, instead of learning general rules. Good on train, worse on new data. | What early stopping and cross-validation protect against. |
+| **Linear vs non-linear model** | Linear: each feature pushes by a fixed amount, added up. Non-linear: can learn curves, thresholds and combinations. | Logistic regression is linear; trees are non-linear. |
+| **Interaction** | When the effect of one feature depends on another ("only when X and Y together"). | Trees can learn them; logistic regression cannot by itself. |
+| **Average precision (AP)** | A 0–1 score of how well a model ranks real failures at the top of the list, regardless of the threshold. Random ≈ positive rate (0.017). | CV AP: 0.828 (boosting) vs 0.779 (logreg). |
+| **Fold-to-fold variation** | How much a score changes between the CV folds; shows how big the noise is. | Boosting fold costs 5,670–8,470. |
+| **Fair comparison** | Same data, same CV, same class weighting, each model with its own tuned threshold. | `compare_models.py`. |
