@@ -81,6 +81,18 @@ About 18% lower cost in cross-validation (35,150 vs 42,880). Validation shows 43
 **Q: What is average precision and why report it?**
 A 0–1 score of how well the model ranks real failures at the top of the list, independent of the threshold. Boosting: 0.828 vs 0.779 in cross-validation. It confirms the ranking itself is better, not just the threshold choice.
 
+**Q: What did your error analysis show?**
+On cross-validated predictions (800 failures), the model missed 42. Most of them (30) had a probability below 0.05, so they are confidently wrong, not near misses: lowering the threshold would not catch them. The missed failures look like lightly used trucks, while the false alarms look like heavily used trucks. For example, the median histogram total is about 34 million for caught failures, 21 million for false alarms, 7 million for missed failures and 2 million for correct negatives. My hypothesis is that the model relies a lot on how intensively a truck was used. Because the feature names are anonymized, I cannot confirm what these columns physically measure.
+
+**Q: Which features matter most?**
+Permutation importance on validation: one column, `ck_000`, dominates (average precision drops by 0.21 when it is shuffled), followed by `bj_000`, a bin of histogram `ag`, and `aa_000`. 57 of 170 columns do not help at all. At group level, histograms `ag` and `ay` matter most. I did not remove features based on this, because choosing features on validation would be tuning on it.
+
+**Q: What are the limits of permutation importance?**
+With correlated columns, such as the 10 bins of one histogram, shuffling one column can under- or over-state its importance: the other bins can cover for it, or the shuffle can create unrealistic rows. So I also shuffled each histogram as a whole group.
+
+**Q: Why might some false alarms be very confident?**
+259 false alarms have a probability above 0.8. In this dataset the negative class is not "healthy trucks" but "trucks with failures in other components", so some of these may show similar symptoms from a different failure. That is a hypothesis I cannot verify with this data.
+
 **Q: Why not oversampling or SMOTE?**
 Class weights give a similar effect without creating artificial data. Those methods remain options to compare later.
 

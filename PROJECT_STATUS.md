@@ -1,7 +1,7 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 4 — Models and evaluation: **in progress** (threshold tuning and model comparison done; error analysis next).
+Phase 4 — Models and evaluation: **complete** (threshold, model comparison, error analysis). Next: Phase 5 — engineering finish.
 
 ## Phase overview
 | Phase | Content | Status |
@@ -10,7 +10,7 @@ Phase 4 — Models and evaluation: **in progress** (threshold tuning and model c
 | 1 | AI4I warm-up (optional) | skipped |
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
 | 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
-| 4 | Threshold (done, S6), tree model + fair comparison (done, S7), error analysis | in progress |
+| 4 | Threshold (S6), tree model + fair comparison (S7), error analysis (S8) | done |
 | 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
 
 ## Key numbers to beat (validation set, 12,000 rows, 200 positives)
@@ -36,6 +36,52 @@ Noise level: 1 truck = 500 cost on validation → differences below about 1,000 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 8 — 2026-11-09
+
+**Objective:** error analysis of `hgb_balanced` — which trucks it gets wrong, and which features it relies on.
+
+### Files created / changed
+- `src/importance.py` (new) — `outcome_labels()`, `group_permutation_importance()`.
+- `src/error_analysis.py` (new) — outcome groups and probability bins on CV predictions (train); permutation importance on validation (measurement only); top-5 feature medians by group; histogram group shuffling. Saves `reports/error_groups.csv`, `reports/permutation_importance.csv`, `reports/group_importance.csv`.
+- `tests/test_importance.py` (new, 3 tests).
+- `docs/GLOSSARY.md`, `docs/INTERVIEW_NOTES.md` — updated.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **45 passed**.
+- `python -m src.error_analysis` → ran successfully (368 s on the T480). CV threshold reproduced: 0.14.
+
+### Verified results
+**Outcome groups (CV on train, threshold 0.14)**
+| Group | Trucks | Median prob. | Mean missing | With `ac_000` code | Median histogram total | Median `aa_000` |
+|---|---|---|---|---|---|---|
+| TP | 758 | 0.976 | 17.3% | 1.1% | 34,291,130 | 591,949 |
+| FN | 42 | 0.021 | 12.9% | 11.9% | 7,043,936 | 121,536 |
+| FP | 1,415 | 0.405 | 18.7% | 3.0% | 20,776,325 | 338,784 |
+| TN | 45,785 | 0.008 | 7.8% | 16.5% | 2,025,425 | 29,722 |
+
+- Missed failures: 8 below 0.01, 22 at 0.01–0.05, 3 at 0.05–0.07, 9 near misses (0.07–0.14).
+- False alarms: 514 at 0.14–0.3, 324 at 0.3–0.5, 318 at 0.5–0.8, 259 above 0.8.
+- Permutation importance (validation, drop in average precision): `ck_000` 0.210, `bj_000` 0.072, `ag_002` 0.065, `aa_000` 0.059, `ay_006` 0.042. 57 of 170 columns ≤ 0.
+- Top-5 medians: failures (TP) have much larger `ck_000`, `bj_000`, `aa_000` than TN; FN sit in between; `ag_002` is non-zero mainly for TP; `ay_006` is highest for FP (non-monotonic pattern).
+- Histogram groups shuffled together: `ag` 0.119 (sum of single bins 0.104), `ay` 0.100 (0.076), `ee` 0.015 (0.009); for `cs`, `cn`, `az` the single-bin sum is larger than the group value.
+
+### Interpretation (hypotheses, not proven)
+- The model seems to rely heavily on the magnitude of usage-like counters (`ck_000`, `bj_000`, `aa_000`, histogram totals). Missed failures look like lightly used trucks; false alarms look like heavily used trucks.
+- Most misses are confidently wrong → threshold changes cannot fix them; the data may lack clues for these trucks. Consistent with the flat threshold valley.
+- Very confident false alarms may be trucks failing in another component (the negative class is "other failures", not "healthy").
+- Single-column importance is unreliable with correlated columns, in both directions (covering effect, and unrealistic shuffled rows breaking the equal histogram totals).
+- Anonymized names prevent any physical interpretation.
+
+### Decisions
+- No feature removal based on validation importance (would be tuning on validation).
+- Documented possible experiment (optional, must be evaluated with CV): usage-normalized features (histogram bins as share of total; counters relative to `aa_000`), motivated by the usage pattern above.
+- **User decision:** do Phase 5 first (option A); try the usage-normalized experiment (option B) after Phase 5 if time allows.
+
+### Next recommended task
+Phase 5, Session 9: final training script that fits the chosen model (`hgb_balanced`, threshold 0.14) on all 60,000 training rows and saves it with its metrics; prediction script that loads it; tests for saving/loading and prediction.
 
 ---
 

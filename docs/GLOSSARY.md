@@ -119,3 +119,16 @@ Grouped by the session where the term first appeared.
 | **Average precision (AP)** | A 0–1 score of how well a model ranks real failures at the top of the list, regardless of the threshold. Random ≈ positive rate (0.017). | CV AP: 0.828 (boosting) vs 0.779 (logreg). |
 | **Fold-to-fold variation** | How much a score changes between the CV folds; shows how big the noise is. | Boosting fold costs 5,670–8,470. |
 | **Fair comparison** | Same data, same CV, same class weighting, each model with its own tuned threshold. | `compare_models.py`. |
+
+## Error analysis (Session 8)
+
+| Term | Simple meaning | In our project |
+|---|---|---|
+| **Error analysis** | Studying the actual cases a model gets wrong, not just its score. Like a coach watching the goals conceded. | 42 misses and 1,415 false alarms (CV on train). |
+| **Outcome groups (TP / FN / FP / TN)** | Every prediction labelled as caught, missed, false alarm, or correct "no". | `outcome_labels()`. |
+| **Near miss** | A missed case with probability just below the threshold; a lower threshold would catch it. | 9 of 42 misses. |
+| **Confidently wrong** | A missed case with a very low probability; no threshold change can fix it. | 30 of 42 misses below 0.05. |
+| **Permutation importance** | Shuffle one column's values between rows and measure how much the score drops. Big drop = important column. | `ck_000` drops average precision by 0.21. |
+| **Group permutation importance** | Shuffle several related columns together, so they cannot "cover" for each other. | Histogram `ag`: 0.119 together vs 0.104 summed. |
+| **Correlated features** | Columns that carry overlapping information. They make single-column importance unreliable (too low or too high). | The 10 bins of a histogram. |
+| **Proxy** | A measurable value used to stand for something we cannot measure directly. | Histogram total and `aa_000` as possible proxies for how much a truck was used (hypothesis). |
