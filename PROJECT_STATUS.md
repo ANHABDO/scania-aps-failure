@@ -1,7 +1,7 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 3 — Preprocessing and baseline: **in progress** (evaluation framework + dummy baselines done; preprocessing pipeline next).
+Phase 3 — Preprocessing and baseline: **complete**. Next: Phase 4 — threshold tuning, cross-validation, tree models.
 
 ## Phase overview
 | Phase | Content | Status |
@@ -9,7 +9,7 @@ Phase 3 — Preprocessing and baseline: **in progress** (evaluation framework + 
 | 0 | Setup: folders, venv, requirements, Git | done |
 | 1 | AI4I warm-up (optional) | skipped |
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
-| 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | in progress (Session 4) |
+| 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
 | 4 | Tree models, imbalance handling, fair comparison, threshold, error analysis | later |
 | 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
 
@@ -19,6 +19,8 @@ Phase 3 — Preprocessing and baseline: **in progress** (evaluation framework + 
 | always_neg | 100,000 | 0% | 98.33% |
 | always_pos | 118,000 | 100% | 1.67% |
 | random_guess | 98,760 | 3% | 96.92% |
+| logreg_plain (threshold 0.5) | 30,800 | 69.5% | 99.24% |
+| **logreg_balanced (threshold 0.5) — current best** | **11,410** | **93.0%** | 96.21% |
 
 ## Open decisions for Phase 3 (preprocessing)
 - `ac_000` coded values (`0x7F000000` + leftover): default = flag column + set value to missing (option b). Option (a) "flag + keep leftover" to test later as an experiment.
@@ -28,6 +30,61 @@ Phase 3 — Preprocessing and baseline: **in progress** (evaluation framework + 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 5 — 2026-11-08 / 2026-11-09
+
+**Objective:** build the preprocessing pipeline (Phase 2 decisions, fitted on train only) and train the first real model.
+
+### Files created / changed
+- `src/preprocessing.py` (new) — `CleanRawValues` custom transformer (learns constant columns; `ac_000` code → `ac_000_is_code` flag + missing; `ad_000`/`cf_000`/`co_000` ≥ 2e9 → missing) + `make_preprocessor()`: clean → `log1p` → median imputation with missing indicators → `StandardScaler`.
+- `src/check_preprocessing.py` (new) — inspects what the pipeline learned and produced.
+- `src/models.py` (new) — `make_logreg_pipeline(class_weight)`: preprocessing + `LogisticRegression(max_iter=2000)`.
+- `src/train_logreg.py` (new) — trains plain and balanced logistic regression, compares with baselines, saves `reports/logreg_results.csv`.
+- `tests/test_preprocessing.py` (new, 9 tests), `tests/test_models.py` (new, 3 tests).
+- `docs/GLOSSARY.md` — preprocessing and logistic-regression terms added.
+- `docs/INTERVIEW_NOTES.md` (new) — interview questions and answers with real numbers.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **34 passed**.
+- `python -m src.check_preprocessing` → ran successfully.
+- `python -m src.train_logreg` → ran successfully (plain 8.9 s, balanced 18.0 s on the T480). No warnings shown.
+
+### Verified results
+**Preprocessing (fit on train)**
+- 170 → 338 columns: 170 − `cd_000` + 1 flag + 168 missing indicators (only columns with missing values in train).
+- `ac_000` codes flagged: train 7,622 + val 1,846 = 9,468 (matches Session 2).
+- Corrupted values: 1 each in `ad_000`, `cf_000`, `co_000`, all in train (row 45977).
+- Missing cells: 679,122 in train → 0 in train and val.
+- Train medians match earlier sessions after undoing the log: `aa_000` ≈ 30,800, `ac_000` ≈ 74, `ad_000` ≈ 126.
+- Scaling: train means exactly 0 / std 1; validation means −0.024 to +0.023, std 0.835 to 1.218 → scaler learned on train only.
+
+**Logistic regression (validation, threshold 0.5)**
+| Model | TN | FP | FN | TP | Precision | Recall | Cost |
+|---|---|---|---|---|---|---|---|
+| logreg_plain | 11,770 | 30 | 61 | 139 | 82.25% | 69.50% | 30,800 |
+| logreg_balanced | 11,359 | 441 | 14 | 186 | 29.67% | 93.00% | 11,410 |
+
+- Balanced: about 8.7× cheaper than the best baseline (98,760), but lower accuracy (96.21%) than always_neg (98.33%) → accuracy trap confirmed on a real model.
+- Balanced cost breakdown: misses 14 × 500 = 7,000; false alarms 441 × 10 = 4,410.
+
+### Decisions
+- `class_weight="balanced"` adopted for logistic regression.
+- 168 individual missing indicators kept for now; grouping them (about 57) remains a later experiment.
+
+### Caution for Phase 4
+- If we choose the threshold by looking at validation results, the validation cost at that threshold becomes optimistic. Use cross-validation on the training part to choose it, then confirm on validation.
+
+### Understood
+- `fit` / `transform` / `fit_transform` and why validation only gets `transform`.
+- Validation means "close to but not exactly 0" as evidence of no leakage.
+- Median vs mean vs 0 for imputation; StandardScaler vs MinMax vs Robust.
+- Weights, bias, sigmoid; `class_weight` as a fix for imbalance.
+- Predicted correctly that balanced weights raise recall.
+
+### Next recommended task
+Phase 4 start: choose the decision threshold for `logreg_balanced` using cross-validated probabilities on the training part (cost-based), then confirm on validation.
 
 ---
 
