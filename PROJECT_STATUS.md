@@ -1,7 +1,7 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 3 — Preprocessing and baseline: **complete**. Next: Phase 4 — threshold tuning, cross-validation, tree models.
+Phase 4 — Models and evaluation: **in progress** (threshold tuning done; tree model next).
 
 ## Phase overview
 | Phase | Content | Status |
@@ -10,7 +10,7 @@ Phase 3 — Preprocessing and baseline: **complete**. Next: Phase 4 — threshol
 | 1 | AI4I warm-up (optional) | skipped |
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
 | 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
-| 4 | Tree models, imbalance handling, fair comparison, threshold, error analysis | later |
+| 4 | Threshold (done, Session 6), tree model + fair comparison, error analysis | in progress |
 | 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
 
 ## Key numbers to beat (validation set, 12,000 rows, 200 positives)
@@ -20,7 +20,10 @@ Phase 3 — Preprocessing and baseline: **complete**. Next: Phase 4 — threshol
 | always_pos | 118,000 | 100% | 1.67% |
 | random_guess | 98,760 | 3% | 96.92% |
 | logreg_plain (threshold 0.5) | 30,800 | 69.5% | 99.24% |
-| **logreg_balanced (threshold 0.5) — current best** | **11,410** | **93.0%** | 96.21% |
+| logreg_balanced (threshold 0.5) | 11,410 | 93.0% | 96.21% |
+| **logreg_balanced (threshold 0.39, chosen by 5-fold CV) — current model** | **11,790** | **93.5%** | 95.48% |
+
+Noise level: 1 truck = 500 cost on validation → differences below about 1,000 are not meaningful.
 
 ## Open decisions for Phase 3 (preprocessing)
 - `ac_000` coded values (`0x7F000000` + leftover): default = flag column + set value to missing (option b). Option (a) "flag + keep leftover" to test later as an experiment.
@@ -30,6 +33,58 @@ Phase 3 — Preprocessing and baseline: **complete**. Next: Phase 4 — threshol
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 6 — 2026-11-09
+
+**Objective:** choose the decision threshold of `logreg_balanced` for the cost, without tuning on validation.
+
+### Files created / changed
+- `src/threshold.py` (new) — `predict_at()`, `cost_at_thresholds()` (144 thresholds: 0.001–0.049 by 0.001, then 0.05–0.99 by 0.01), `best_threshold()`.
+- `src/tune_threshold.py` (new) — 5-fold stratified CV out-of-fold probabilities on train → choose threshold → apply once on validation; saves `reports/threshold_cv.csv`, `reports/threshold_validation.csv`.
+- `tests/test_threshold.py` (new, 5 tests).
+- `docs/GLOSSARY.md`, `docs/INTERVIEW_NOTES.md` — updated.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **39 passed**.
+- `python -m src.tune_threshold` → ran successfully (CV 58 s on the T480).
+
+### Verified results
+**CV on train (800 failures)**
+| Threshold | FP | FN | Precision | Recall | Cost |
+|---|---|---|---|---|---|
+| 0.10 | 4,035 | 29 | 16.0% | 96.4% | 54,850 |
+| 0.30 | 2,296 | 43 | 24.8% | 94.6% | 44,460 |
+| **0.39 (chosen)** | 1,888 | 48 | 28.5% | 94.0% | **42,880** |
+| 0.50 | 1,525 | 59 | 32.7% | 92.6% | 44,750 |
+| 0.90 | 540 | 125 | 55.6% | 84.4% | 67,900 |
+
+**Validation (200 failures)**
+| Threshold | TN | FP | FN | TP | Recall | Cost |
+|---|---|---|---|---|---|---|
+| 0.50 | 11,359 | 441 | 14 | 186 | 93.0% | 11,410 |
+| 0.39 (CV) | 11,271 | 529 | 13 | 187 | 93.5% | 11,790 |
+| (peeking, not used) 0.26 | — | — | — | — | — | 10,830 |
+
+### Interpretation
+- Flat optimum between about 0.3 and 0.5 (CV cost within about 4%).
+- Validation difference 0.39 vs 0.5 (+380) = 1 fewer miss, 88 more alarms → noise (about 1 truck).
+- Best threshold is near 0.5, not near 0.02, because `class_weight="balanced"` already shifted the probabilities (same job as lowering the threshold).
+- Tuning on validation would pick 0.26 → shows how validation-tuning overfits to 200 specific failures.
+
+### Decisions
+- Keep threshold **0.39** (procedure fixed before seeing validation). Do not switch to 0.5 because validation preferred it — that would be tuning on validation.
+- Threshold is not the main lever for this model; next gains must come from a better model.
+- For model comparison, prefer CV cost (800 failures) over validation alone (200 failures, noisier).
+
+### Understood
+- `predict_proba` and choosing our own threshold.
+- k-fold cross-validation and out-of-fold predictions; why tuning on validation is optimistic.
+- Predicted correctly that the best threshold is below 0.5.
+
+### Next recommended task
+Session 7: a tree-based model (`HistGradientBoostingClassifier`), compared fairly with `logreg_balanced` using the same 5-fold CV procedure (cost at each model's own CV-chosen threshold), then confirmed on validation.
 
 ---
 

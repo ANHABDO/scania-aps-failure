@@ -8,7 +8,7 @@ Updated every session.
 
 ## The project in 30 seconds
 
-> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. My current best model, a class-balanced logistic regression inside a leak-free scikit-learn pipeline, catches 93% of failures on validation and cuts the cost from about 98,760 for the best dummy baseline to 11,410."
+> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. My current best model, a class-balanced logistic regression inside a leak-free scikit-learn pipeline with a threshold chosen by cross-validation, catches about 93% of failures on validation and cuts the cost from about 98,760 for the best dummy baseline to about 11,800."
 
 ---
 
@@ -63,6 +63,12 @@ The features are extremely skewed (median skewness 18.4) and their maximums rang
 **Q: How do you handle the class imbalance?**
 `class_weight="balanced"`: errors on the rare positive class count about 59 times more during training. It raised recall from 69.5% to 93% and cut the cost from 30,800 to 11,410.
 
+**Q: How did you choose the decision threshold?**
+I tested 144 thresholds on 5-fold cross-validated predictions from the training data and kept the one with the lowest cost (0.39). Then I applied it once to validation. I did not tune on validation, because that would overfit to its 200 failures: tuning there would have picked 0.26, a very different value.
+
+**Q: Did threshold tuning help?**
+Honestly, not much for this model. The cost is almost flat between 0.3 and 0.5, and on validation 0.39 cost 11,790 versus 11,410 at 0.5. That difference is about one truck, so it is noise. The class weighting had already shifted the probabilities, which does the same job as lowering the threshold.
+
 **Q: Why not oversampling or SMOTE?**
 Class weights give a similar effect without creating artificial data. Those methods remain options to compare later.
 
@@ -85,6 +91,7 @@ A fixed random seed (42), pinned dependencies (`requirements.txt` from `pip free
 | Always "no failure" | 100,000 | 0% | 0% | 98.33% |
 | Random guess | 98,760 | 3.0% | 3.3% | 96.92% |
 | Logistic regression | 30,800 | 69.5% | 82.3% | 99.24% |
-| **Logistic regression, balanced** | **11,410** | **93.0%** | 29.7% | 96.21% |
+| Logistic regression, balanced (threshold 0.5) | 11,410 | 93.0% | 29.7% | 96.21% |
+| **Logistic regression, balanced (threshold 0.39, chosen by CV)** | **11,790** | **93.5%** | 26.1% | 95.48% |
 
-These are validation results. The final test-set score will be measured only once, at the end.
+These are validation results. With only 200 failures, differences below about 1,000 are noise. The final test-set score will be measured only once, at the end.

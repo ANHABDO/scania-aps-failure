@@ -90,3 +90,16 @@ Grouped by the session where the term first appeared.
 | **class_weight="balanced"** | Makes mistakes on the rare class count more in training, so both classes carry equal total weight. | Each positive counts ≈ 59× a negative. Cost 30,800 → 11,410. |
 | **Convergence / max_iter** | Training is a step-by-step search; it "converges" when it stops improving. max_iter = maximum number of steps. | `max_iter=2000`, no warning. |
 | **Oversampling / SMOTE** | Other ways to handle imbalance: repeat positives / create synthetic positives. | Alternatives for Phase 4. |
+
+## Threshold and cross-validation (Session 6)
+
+| Term | Simple meaning | In our project |
+|---|---|---|
+| **predict_proba** | Gives probabilities instead of yes/no. Two columns: [P(neg), P(pos)]; we keep column 1. | `model.predict_proba(X_val)[:, 1]` |
+| **Threshold tuning** | Choosing the probability cut-off that best fits our goal (here: lowest cost). | 144 thresholds tested; 0.39 chosen. |
+| **Cross-validation (k-fold)** | Cut the data into k parts; train on k−1, test on the remaining one; rotate k times. Several "practice exams" instead of one. | 5-fold on the 48,000 train rows. |
+| **StratifiedKFold** | k-fold where every part keeps the same class proportions. | Each fold has 1.67% positives. |
+| **Out-of-fold predictions** | Predictions for each row made by a model that never saw that row during training. | Used to choose the threshold. |
+| **Overfitting to validation** | Tuning choices until they fit the validation set's specific rows; the score then looks better than it would on new data. | "Peeking" picks 0.26 (cost 10,830) instead of CV's 0.39. |
+| **Noise** | Random variation that is not a real difference. | 1 truck = 500 cost; differences below about 1,000 on validation are not meaningful. |
+| **Flat optimum** | A range of settings that all perform about equally well. | Thresholds 0.3–0.5: CV cost within about 4%. |
