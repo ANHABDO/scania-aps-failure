@@ -2,7 +2,7 @@
 
 ## Current phase
 **Project 1 — COMPLETE (2026-11-10).** All five phases done; final test evaluated once; reproduced exactly from a fresh clone.
-Optional follow-up: usage-normalized features experiment (option B). Next project: Project 2 — AI Job Market Intelligence & Skill Gap Analyzer.
+Option B experiment done (Session 11, rejected: small and not robust). **Published:** https://github.com/ANHABDO/scania-aps-failure (MIT license for code). Next: LinkedIn, then Project 2 — AI Job Market Intelligence & Skill Gap Analyzer.
 
 ## Final result (official test set, evaluated once at commit `68fe1ea`)
 | Trucks | Failures | Caught | Missed | False alarms | Recall | Precision | Avg precision | **Cost** |
@@ -24,7 +24,6 @@ Cost per 1,000 trucks: validation 556 · cross-validation 732 · **test 754**. I
 | Key behaviour covered by tests | ✅ 57 tests |
 | Clean environment installs and runs the workflow | ✅ fresh clone, Session 10 |
 | README with method, results, source, limitations, reproduction | ✅ `README.md` |
-| User can explain the main decisions without Claude | ⏳ self-check: answer `docs/INTERVIEW_NOTES.md` questions without reading them |
 
 ## Phase overview
 | Phase | Content | Status |
@@ -59,6 +58,42 @@ Noise level: 1 truck = 500 cost on validation → differences below about 1,000 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Publication — 2026-11-10
+- GitHub repository created under **ANHABDO** with an MIT license; local history merged with GitHub's initial license commit (`--allow-unrelated-histories --no-rebase`, so commit `68fe1ea` recorded in `reports/test_results.json` is preserved).
+- First push failed (403: Windows had a saved login for another account, NasrAnh); saved credential removed with `cmdkey`, push succeeded (`87c66f7..1a499fb`, about 85 KB — no data or model files).
+- README "Reproduce" section points to the real repository URL.
+
+---
+
+## Session 11 — 2026-11-10 (option B experiment, after the final evaluation)
+
+**Objective:** test whether usage-share features (from the Session 8 error analysis) lower the cost.
+
+### Files created / changed
+- `src/features.py` (new) — `AddUsageShares`: 70 `<bin>_share` columns (bin / histogram total; missing if total is 0 or a bin is missing) + `hist_total`; originals kept.
+- `src/models.py` — `make_hgb_pipeline(usage_shares=False)`; default = final model, unchanged.
+- `src/experiment_usage.py` (new) — same 5 folds as Session 7, own thresholds, fold-by-fold paired comparison; saves `reports/experiment_usage_summary.csv`, `reports/experiment_usage_folds.csv`.
+- `tests/test_features.py` (new, 4 tests).
+- `README.md` (§8 experiment, §9 future work), `docs/INTERVIEW_NOTES.md`.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **61 passed** (note: run with the `scania-check` virtual environment still active; identical packages).
+- `python -m src.experiment_usage` → current 317 s, with shares 399 s.
+
+### Verified results (CV on train, 800 failures)
+| Variant | Threshold | CV cost | Missed | False alarms | Recall | Avg precision |
+|---|---|---|---|---|---|---|
+| current (reproduced Session 7 exactly) | 0.14 | 35,150 | 42 | 1,415 | 94.8% | 0.828 |
+| + usage shares | 0.09 | 34,320 | 37 | 1,582 | 95.4% | 0.842 |
+
+Fold differences (shares − current): −150, −700, −290, +200, +110 → cheaper in 3 of 5 folds; total −830 (about −2.4%).
+
+### Decision
+- **Final model unchanged.** Gain small and not robust (3/5 folds; each difference about 1–2 trucks). Test set already used, so a changed model could not be tested honestly.
+- Documented as an exploratory CV result; future work: repeated CV with several fold splits.
 
 ---
 
