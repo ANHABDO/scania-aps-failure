@@ -1,0 +1,3 @@
+variant,threshold,cv_cost,missed,false_alarms,recall,avg_precision
+hgb_balanced (current),0.14,35150,42,1415,0.9475,0.8281567146532376
+hgb_balanced + usage shares,0.09,34320,37,1582,0.95375,0.8418495719183382
