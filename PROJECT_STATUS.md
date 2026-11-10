@@ -1,7 +1,7 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 4 — Models and evaluation: **complete** (threshold, model comparison, error analysis). Next: Phase 5 — engineering finish.
+Phase 5 — Engineering finish: **in progress** (final model saved + prediction script done; README, fresh-install check and final test evaluation next).
 
 ## Phase overview
 | Phase | Content | Status |
@@ -11,7 +11,7 @@ Phase 4 — Models and evaluation: **complete** (threshold, model comparison, er
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
 | 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
 | 4 | Threshold (S6), tree model + fair comparison (S7), error analysis (S8) | done |
-| 5 | Training/prediction scripts, model saving, README, single final test evaluation | later |
+| 5 | Final training + saving, prediction script (S9); README, fresh-install check, single final test evaluation | in progress |
 
 ## Key numbers to beat (validation set, 12,000 rows, 200 positives)
 | Model | Cost | Recall | Accuracy |
@@ -36,6 +36,38 @@ Noise level: 1 truck = 500 cost on validation → differences below about 1,000 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 9 — 2026-11-10
+
+**Objective:** train the final model, save it with metadata, and build a prediction command.
+
+### Files created / changed
+- `src/model_io.py` (new) — `save_model()` (joblib + `model_meta.json`), `load_model()` (clear error if missing, warning if scikit-learn version differs).
+- `src/train_final.py` (new) — fits `hgb_balanced` on all 60,000 training-file rows, `FINAL_THRESHOLD = 0.14`, saves to `models/`, writes `data/samples/sample_trucks.csv` (20 training trucks, 5 failures — for testing the tool only).
+- `src/predict.py` (new) — CLI (`--input`, `--output`, `--model-dir`); finds the header line (plain CSV or official file with license text); validates columns; outputs `row`, `probability`, `flag_for_aps_check`.
+- `tests/test_predict.py` (new, 9 tests).
+- `docs/GLOSSARY.md`, `docs/INTERVIEW_NOTES.md` — updated.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **54 passed**.
+- `python -m src.train_final` → trained in 78 s on the T480; saved `models/model.joblib` and `models/model_meta.json`.
+- `python -m src.predict --help` → help text shown.
+- `python -m src.predict --input data/samples/sample_trucks.csv --output reports/sample_predictions.csv` → 20 trucks, 5 flagged.
+
+### Notes
+- The 20 sample trucks come from the training file, so the model has seen them: the sample run checks that the tool works, not how good the model is.
+- `models/` and `data/` are not committed (`.gitignore`); the model is re-created exactly with `python -m src.train_final`.
+- The official test set is still untouched.
+
+### Understood
+- Saving/loading a whole Pipeline; metadata as the model's label; version pinning; joblib security caution.
+- argparse and a command-line interface.
+- (Corrected) Correct predictions on training rows prove nothing about quality, because the model has already seen them.
+
+### Next recommended task
+Session 10: README (method, real results, source/license, limitations, reproduction steps), fresh-install check (new virtual environment from `requirements.txt`, run the tests), and the single final evaluation on the official test set.
 
 ---
 

@@ -132,3 +132,20 @@ Grouped by the session where the term first appeared.
 | **Group permutation importance** | Shuffle several related columns together, so they cannot "cover" for each other. | Histogram `ag`: 0.119 together vs 0.104 summed. |
 | **Correlated features** | Columns that carry overlapping information. They make single-column importance unreliable (too low or too high). | The 10 bins of a histogram. |
 | **Proxy** | A measurable value used to stand for something we cannot measure directly. | Histogram total and `aa_000` as possible proxies for how much a truck was used (hypothesis). |
+
+## Packaging the model (Session 9)
+
+| Term | Simple meaning | In our project |
+|---|---|---|
+| **Final model** | The chosen model, retrained on all allowed data once every decision is frozen. | `hgb_balanced` on all 60,000 training-file rows. |
+| **Model artifact** | The saved file that contains a trained model. | `models/model.joblib`. |
+| **Serialization (save / load)** | Turning a Python object into a file and back. | `joblib.dump()` / `joblib.load()`. |
+| **joblib** | A library that saves and loads Python objects, efficient for large arrays. Installed with scikit-learn. | Used in `model_io.py`. |
+| **Metadata** | "Data about data": the label on the jar. | `models/model_meta.json`: threshold, features, versions, CV results. |
+| **JSON** | A simple text format for structured information, readable by humans and programs. | The metadata file. |
+| **Inference / prediction** | Using a trained model on new data, without training again. | `python -m src.predict`. |
+| **Command-line interface (CLI)** | A program you run from the terminal with options like `--input`. | `predict.py`. |
+| **argparse** | Python's standard library for reading command-line options and producing `--help`. | `--input`, `--output`, `--model-dir`. |
+| **Input validation** | Checking that incoming data has the expected shape before using it. | Missing columns or non-numeric values raise a clear error. |
+| **Version pinning** | Recording exact library versions so results can be reproduced. | `requirements.txt` + versions on the model label. |
+| **Untrusted pickle / joblib files** | Loading a `.joblib` file can run code, so only load files you created or trust. | Warning in `model_io.py`. |

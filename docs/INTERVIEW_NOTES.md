@@ -103,8 +103,17 @@ Class weights give a similar effect without creating artificial data. Those meth
 **Q: How do you make it reproducible?**
 A fixed random seed (42), pinned dependencies (`requirements.txt` from `pip freeze`), Git history, and scripts that save their results to `reports/`.
 
+**Q: How do you go from experiments to a usable model?**
+Once every decision was frozen (model, class weighting, threshold 0.14 chosen by cross-validation), I retrained the model once on all 60,000 training rows and saved it with joblib. Next to it I save a JSON metadata file with the threshold, the 170 feature names, the training date, the library versions and the cross-validation results. A command-line script loads it and writes, for each truck, a failure probability and a 0/1 "flag for APS check".
+
+**Q: Why retrain on train + validation at the end?**
+Validation was only needed to make decisions. Once they are frozen, using all the data usually gives a slightly better model. The trade-off is that this exact model has no practice exam left, so its only check is the final test set, used once.
+
+**Q: How does the prediction script protect against bad input?**
+It checks that all 170 required columns exist and are numeric, raises a clear error otherwise, ignores extra columns such as an ID, reorders columns to the training order, and reads `na` as missing exactly like in training. It also warns if the installed scikit-learn version differs from the one used for training.
+
 **Q: How do you test it?**
-34 automated tests with pytest. They check that loading reads `na` correctly and fails loudly on unexpected values, that the cost is right on hand-checked examples, that the split is stratified and repeatable, and that the pipeline learns only from training data.
+54 automated tests with pytest. They check that loading reads `na` correctly and fails loudly on unexpected values, that the cost is right on hand-checked examples, that the split is stratified and repeatable, and that the pipeline learns only from training data.
 
 ---
 
