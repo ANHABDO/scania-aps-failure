@@ -1,7 +1,30 @@
 # Project Status — APS Failure at Scania Trucks
 
 ## Current phase
-Phase 5 — Engineering finish: **in progress** (final model saved + prediction script done; README, fresh-install check and final test evaluation next).
+**Project 1 — COMPLETE (2026-11-10).** All five phases done; final test evaluated once; reproduced exactly from a fresh clone.
+Optional follow-up: usage-normalized features experiment (option B). Next project: Project 2 — AI Job Market Intelligence & Skill Gap Analyzer.
+
+## Final result (official test set, evaluated once at commit `68fe1ea`)
+| Trucks | Failures | Caught | Missed | False alarms | Recall | Precision | Avg precision | **Cost** |
+|---|---|---|---|---|---|---|---|---|
+| 16,000 | 375 | 361 | 14 | 506 | 96.3% | 41.6% | 0.880 | **12,060** |
+
+Cost per 1,000 trucks: validation 556 · cross-validation 732 · **test 754**. IDA 2016 challenge on the same test set: 9,920 / 10,900 / 11,480 (top three).
+
+## Master brief — definition of done (Project 1)
+| Criterion | Status |
+|---|---|
+| Explain the prediction problem and dataset limitations | ✅ README §1, §5; interview notes |
+| Repeatable data loading and validation | ✅ `data_loading.py` + tests |
+| Preprocessing and modeling without leakage | ✅ Pipelines; CV; test locked until the end |
+| Baseline + at least two models compared fairly | ✅ dummies, logistic regression, gradient boosting (same CV, own thresholds) |
+| Imbalance-aware metrics with error analysis | ✅ cost, recall, precision, average precision; Session 8 |
+| Training command saves real metrics and a trained model | ✅ `train_final.py` (+ `reports/`) |
+| Prediction path loads the saved model | ✅ `predict.py` |
+| Key behaviour covered by tests | ✅ 57 tests |
+| Clean environment installs and runs the workflow | ✅ fresh clone, Session 10 |
+| README with method, results, source, limitations, reproduction | ✅ `README.md` |
+| User can explain the main decisions without Claude | ⏳ self-check: answer `docs/INTERVIEW_NOTES.md` questions without reading them |
 
 ## Phase overview
 | Phase | Content | Status |
@@ -11,7 +34,7 @@ Phase 5 — Engineering finish: **in progress** (final model saved + prediction 
 | 2 | Data understanding + first tests | done (Sessions 1–3) |
 | 3 | Train/validation split, cost metric, baselines, preprocessing pipeline, logistic regression | done (Sessions 4–5) |
 | 4 | Threshold (S6), tree model + fair comparison (S7), error analysis (S8) | done |
-| 5 | Final training + saving, prediction script (S9); README, fresh-install check, single final test evaluation | in progress |
+| 5 | Final training + saving, prediction script (S9); final test evaluation, README, fresh-install check (S10) | done |
 
 ## Key numbers to beat (validation set, 12,000 rows, 200 positives)
 | Model | Cost | Recall | Accuracy |
@@ -36,6 +59,40 @@ Noise level: 1 truck = 500 cost on validation → differences below about 1,000 
 - Do not drop zero-heavy columns by zero rate alone (rare non-zero values may be informative).
 - Experiment for later: histogram bins as share of histogram total.
 - Any feature selection based on the target must happen after the train/validation split.
+
+---
+
+## Session 10 — 2026-11-10
+
+**Objective:** one-time final test evaluation, README, fresh-install reproduction.
+
+### Files created / changed
+- `src/evaluate_test.py` (new) — refuses to run with uncommitted changes or if `reports/test_results.json` exists; records the Git commit; evaluates the saved model once on the official test set.
+- `tests/test_evaluate_test.py` (new, 3 tests).
+- `README.md` (new) — problem, data and license, data-quality findings, method, results (CV / validation / test), limitations, reproduction, structure, future work.
+- `reports/test_results.json` (official result), `docs/INTERVIEW_NOTES.md`, `PROJECT_STATUS.md`.
+
+### Commands actually run (by the user)
+- `python -m pytest -v` → **57 passed**.
+- Commit `68fe1ea`, then `python -m src.evaluate_test` → official result above.
+- Fresh clone `scania-check` (commit `9341805`): new venv, `pip install -r requirements.txt` OK, `pytest` **57 passed**, `train_final` (98 s), `evaluate_test --output reports/test_results_check.json` → **identical result** (cost 12,060; 361 / 14 / 506).
+
+### Interpretation
+- Test cost per 1,000 trucks (754) matches the cross-validation estimate (732); validation (556) was optimistic.
+- Test set has a higher failure rate (2.34% vs 1.67%); per failure the miss rate was lower on test (3.7%) than in CV (5.2%).
+- About 22% above the IDA 2016 winner, with default hyperparameters and no feature engineering.
+
+### Understood
+- Why the test set is used once, from a frozen and committed state.
+- Why CV is a better estimate than one validation split (confirmed by the test).
+- What a fresh-install check proves.
+- (Corrected) Gradient boosting is itself a tree ensemble; the gap to the winners is not "trees vs boosting" but tuning and feature engineering (their exact methods unknown).
+
+### Next recommended task
+1. Self-check: answer the questions in `docs/INTERVIEW_NOTES.md` aloud without reading the answers.
+2. Optional: publish the repository on GitHub (without `data/` and `models/`).
+3. Optional: option B experiment (usage-normalized features, evaluated with CV — the test set must not be used again for decisions).
+4. Then start Project 2.
 
 ---
 

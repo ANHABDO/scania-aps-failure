@@ -8,7 +8,7 @@ Updated every session.
 
 ## The project in 30 seconds
 
-> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. I compared a logistic regression and a gradient-boosting model under identical cross-validation. Gradient boosting won: about 18% lower cross-validated cost, and on validation it catches 97% of failures, cutting the cost from about 98,760 for the best dummy baseline to 6,670."
+> "I built a predictive-maintenance classifier on real operational data from Scania trucks. The goal is to predict whether a truck's failure comes from one specific component of its air-pressure system. The data is messy: 8% missing values, coded values, a corrupted record, and only 1.67% positive cases. Missing a failure costs 50 times more than a false alarm, so I evaluate with that cost instead of accuracy. I compared logistic regression and gradient boosting under identical cross-validation; gradient boosting won. Evaluated once on the untouched official test set, it catches 96% of failures (361 of 375) with a cost of 12,060; the 2016 challenge winner scored 9,920. The whole project reproduces exactly from a fresh clone."
 
 ---
 
@@ -112,8 +112,14 @@ Validation was only needed to make decisions. Once they are frozen, using all th
 **Q: How does the prediction script protect against bad input?**
 It checks that all 170 required columns exist and are numeric, raises a clear error otherwise, ignores extra columns such as an ID, reorders columns to the training order, and reads `na` as missing exactly like in training. It also warns if the installed scikit-learn version differs from the one used for training.
 
+**Q: What was your final test result, and how do you interpret it?**
+Evaluated once, from a committed Git state, on 16,000 new trucks: 361 of 375 failures caught (recall 96.3%), 14 missed, 506 false alarms, cost 12,060. The IDA 2016 winner scored 9,920 on the same test set, with my model using default settings and no feature engineering. The key lesson: per 1,000 trucks, cross-validation estimated 732 and the test gave 754, while the single validation split said 556. Cross-validation predicted the real result; validation was optimistic.
+
+**Q: How do you know your project is reproducible?**
+I cloned the repository into a new folder, created a fresh virtual environment from `requirements.txt`, ran the 57 tests, retrained the model and re-evaluated it: exactly the same test result (cost 12,060, same 361 / 14 / 506 counts).
+
 **Q: How do you test it?**
-54 automated tests with pytest. They check that loading reads `na` correctly and fails loudly on unexpected values, that the cost is right on hand-checked examples, that the split is stratified and repeatable, and that the pipeline learns only from training data.
+57 automated tests with pytest. They check that loading reads `na` correctly and fails loudly on unexpected values, that the cost is right on hand-checked examples, that the split is stratified and repeatable, and that the pipeline learns only from training data.
 
 ---
 
@@ -128,4 +134,6 @@ It checks that all 170 required columns exist and are numeric, raises a clear er
 | Logistic regression, balanced (threshold 0.39, chosen by CV) | 11,790 | 93.5% | 26.1% | 95.48% |
 | **Gradient boosting, balanced (threshold 0.14, chosen by CV)** | **6,670** | **97.0%** | 34.6% | 96.89% |
 
-These are validation results. With only 200 failures, differences below about 1,000 are noise. The final test-set score will be measured only once, at the end.
+These are validation results. With only 200 failures, differences below about 1,000 are noise.
+
+**Final test (16,000 trucks, 375 failures, evaluated once):** caught 361, missed 14, false alarms 506, recall 96.3%, precision 41.6%, cost **12,060**. The final test-set score will be measured only once, at the end.
