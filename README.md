@@ -106,7 +106,7 @@ Errors do not cost the same (official cost rule of the dataset):
 Requirements: Python 3.14 (tested on Windows with Python 3.14.6, CPU only, 8 GB RAM); exact library versions in `requirements.txt`. Timings below are from a ThinkPad T480.
 
 ```powershell
-git clone <this-repository> scania-aps-failure
+git clone https://github.com/ANHABDO/scania-aps-failure.git
 cd scania-aps-failure
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Linux/macOS: source .venv/bin/activate
@@ -117,7 +117,7 @@ Download the dataset from the UCI page and put these two files in `data/raw/`:
 `aps_failure_training_set.csv`, `aps_failure_test_set.csv`.
 
 ```powershell
-python -m pytest                     # 57 tests (about 1 minute)
+python -m pytest                     # 61 tests (about 1 minute)
 python -m src.run_baselines          # dummy baselines            -> reports/baseline_results.csv
 python -m src.compare_models         # CV comparison (~6 min)     -> reports/model_comparison.csv
 python -m src.error_analysis         # error analysis (~6 min)    -> reports/error_groups.csv, ...
@@ -152,18 +152,31 @@ src/
   train_final.py         train and save the final model
   predict.py             command-line predictions
   evaluate_test.py       one-time final test evaluation
+  features.py            usage-share features (experiment, section 8)
   (exploration scripts)  inspect_data, investigate_quality, explore_distributions,
                          check_preprocessing, run_baselines, train_logreg,
-                         tune_threshold, compare_models, error_analysis
-tests/                   57 pytest tests
+                         tune_threshold, compare_models, error_analysis,
+                         experiment_usage
+tests/                   61 pytest tests
 reports/                 saved results (CSV / JSON)
 docs/                    GLOSSARY.md, INTERVIEW_NOTES.md
 PROJECT_STATUS.md        session-by-session log of decisions and results
 ```
 
-## 8. Future work
+## 8. Experiment after the final evaluation: usage-share features
 
-- **Usage-normalized features** (histogram bins as share of their total; counters relative to `aa_000`), motivated by the error analysis. To be evaluated with cross-validation.
+Motivated by the error analysis, I added 70 features (each histogram bin divided by its histogram's total) plus the histogram total, keeping all original columns, and compared with the final model on the same 5 cross-validation folds (`python -m src.experiment_usage`, about 12 minutes).
+
+| Variant | Threshold | CV cost | Missed | False alarms | Average precision |
+|---|---|---|---|---|---|
+| Final model | 0.14 | 35,150 | 42 | 1,415 | 0.828 |
+| + usage shares | 0.09 | 34,320 | 37 | 1,582 | 0.842 |
+
+Fold by fold the shares were cheaper in **3 of 5 folds** (differences −150, −700, −290, +200, +110). The total gain (−830, about 2.4%) is the size of one or two trucks per fold, so it is **small and not robust**. The final model was **not changed**: the evidence is weak, and the test set has already been used, so a changed model could not get an unbiased test score. This is reported as an exploratory cross-validation result only.
+
+## 9. Future work
+
+- Usage-share features: confirm or reject the small gain with repeated cross-validation (several random fold splits).
 - Hyperparameter tuning of gradient boosting (with cross-validation).
 - Grouped missing indicators (one per missingness block instead of 168).
 - Cost-sensitive analysis for other cost ratios.
