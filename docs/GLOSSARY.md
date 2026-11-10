@@ -133,6 +133,21 @@ Grouped by the session where the term first appeared.
 | **Correlated features** | Columns that carry overlapping information. They make single-column importance unreliable (too low or too high). | The 10 bins of a histogram. |
 | **Proxy** | A measurable value used to stand for something we cannot measure directly. | Histogram total and `aa_000` as possible proxies for how much a truck was used (hypothesis). |
 
+## Feature engineering experiment (Session 11)
+
+| Term | Simple meaning | In our project |
+|---|---|---|
+| **Feature** | One piece of information about each example: one column. | 170 sensor/counter columns. |
+| **Feature engineering** | Creating new columns from existing ones, so the model gets information in a more useful shape. | 70 share columns + `hist_total`. |
+| **Histogram / bin** | A histogram counts how often a measurement fell in each range; a bin is one range. | 7 histograms × 10 bins. |
+| **Share (proportion)** | A part of a whole, between 0 and 1: bin ÷ histogram total. Describes "how", not "how much". | 100, 300, 600 → 0.1, 0.3, 0.6. |
+| **`min_count`** | pandas option: give a sum only if at least this many values are present; otherwise NaN. | Total missing if any bin is missing. |
+| **`inf` (infinity)** | A special value "bigger than any number", produced by dividing a non-zero number by 0 in NumPy/pandas. Models refuse it. | Avoided by turning a total of 0 into NaN. |
+| **Paired comparison** | Comparing two versions on exactly the same cases (same folds), case by case. | Fold-by-fold cost differences. |
+| **Sanity check** | A quick check that something known comes out as expected, to catch setup mistakes. | The current model must reproduce 35,150. |
+| **Synthetic data / planted signal** | Fake data made by code, with a pattern deliberately put in. Proves the code works, not that the idea helps on real data. | Fake trucks whose failures had a different histogram shape. |
+| **Unit test** | A small, fast test of one piece of code in isolation, with hand-checkable numbers. | `tests/test_features.py`. |
+
 ## Packaging the model (Session 9)
 
 | Term | Simple meaning | In our project |
